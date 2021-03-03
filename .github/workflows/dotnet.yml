@@ -1,25 +1,45 @@
-name: .NET
+
+Skip to content
+Pull requests
+Issues
+Marketplace
+name: Build and Deploy
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches:
+      - master
+
+env:
+  AZURE_WEBAPP_NAME: Planetzine.sln     # set this to your application's name
+  AZURE_WEBAPP_PACKAGE_PATH: 'published'      # set this to the path to your web app project, defaults to the repository root
 
 jobs:
   build:
-
+    name: Build and deploy
     runs-on: windows-latest
-
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v1.7.2
+    
+    - name: Setup MSBuild path
+      uses: microsoft/setup-msbuild@v1.0.1
       with:
-        dotnet-version: 4.6.1
-    - name: Restore dependencies
-      run: dotnet restore
+        vs-version: "[16.4,16.9)"
+    
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1.0.2
+    
+    - name: Restore NuGet packages
+      run: nuget restore ${{ env.AZURE_WEBAPP_NAME }}
+
     - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+      run: msbuild ${{ env.AZURE_WEBAPP_NAME }} /p:Configuration=Release
+
+    - name: Publish to folder
+      run: msbuild ${{ env.AZURE_WEBAPP_NAME }} /p:Configuration=Release /p:DeployOnBuild=true /t:WebPublish /p:WebPublishMethod=FileSystem /p:publishUrl=${{ env.AZURE_WEBAPP_PACKAGE_PATH }} /p:PackageAsSingleFile=false
+
+    - name: Publish artifacts
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: webapp
+        path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
